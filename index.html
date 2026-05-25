@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Game Mencocokkan Buah</title>
+
+<style>
+
+*{
+    box-sizing:border-box;
+    margin:0;
+    padding:0;
+}
+
+body{
+
+    background:
+    linear-gradient(
+        rgba(0,0,0,0.4),
+        rgba(0,0,0,0.4)
+    ),
+    url('latar.jpeg');
+
+    background-size:cover;
+    background-position:center;
+    background-repeat:no-repeat;
+    background-attachment:fixed;
+
+    color:#ffffff;
+
+    font-family:
+    'Segoe UI',
+    Tahoma,
+    Geneva,
+    Verdana,
+    sans-serif;
+
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+
+    min-height:100vh;
+
+    padding:20px;
+}
+
+h1{
+
+    margin-bottom:10px;
+
+    color:#fecdd3;
+
+    text-shadow:0 0 10px #fecdd3;
+
+    font-size:2rem;
+
+    text-transform:uppercase;
+}
+
+.score-board{
+
+    margin-bottom:20px;
+
+    font-size:1.1rem;
+
+    color:#bae6fd;
+
+    text-shadow:0 0 5px #bae6fd;
+
+    font-weight:bold;
+}
+
+.game-container{
+
+    display:grid;
+
+    grid-template-columns:
+    repeat(4,1fr);
+
+    gap:10px;
+
+    width:100%;
+    max-width:450px;
+
+    perspective:1000px;
+}
+
+.card{
+
+    aspect-ratio:1/1;
+
+    position:relative;
+
+    transform-style:preserve-3d;
+
+    transition:
+    transform 0.5s,
+    transform 0.2s;
+
+    cursor:pointer;
+}
+
+.card.flipped{
+    transform:rotateY(180deg);
+}
+
+.card.shake{
+    animation:shake 0.4s;
+}
+
+@keyframes shake{
+
+    0%{transform:translateX(0);}
+    25%{transform:translateX(-5px);}
+    50%{transform:translateX(5px);}
+    75%{transform:translateX(-5px);}
+    100%{transform:translateX(0);}
+}
+
+.card-front,
+.card-back{
+
+    position:absolute;
+
+    width:100%;
+    height:100%;
+
+    backface-visibility:hidden;
+
+    display:flex;
+
+    align-items:center;
+    justify-content:center;
+
+    border-radius:12px;
+
+    overflow:hidden;
+}
+
+.card-back{
+
+    background:
+    rgba(0,0,0,0.8);
+
+    border:3px solid #e9d5ff;
+
+    box-shadow:
+    0 0 12px #e9d5ff;
+}
+
+.card-back::after{
+
+    content:"?";
+
+    color:#e9d5ff;
+
+    font-size:2rem;
+
+    font-weight:bold;
+}
+
+.card-front{
+
+    background-color:#111827;
+
+    border:3px solid #00ffcc;
+
+    box-shadow:
+    0 0 12px #00ffcc;
+
+    transform:rotateY(180deg);
+}
+
+.card-front img{
+
+    width:100%;
+    height:100%;
+
+    object-fit:cover;
+}
+
+.reset-btn{
+
+    margin-top:20px;
+
+    padding:12px 24px;
+
+    background-color:
+    rgba(255,255,255,0.1);
+
+    color:#ffffff;
+
+    border:2px solid #ffffff;
+
+    border-radius:8px;
+
+    font-size:1rem;
+
+    font-weight:bold;
+
+    cursor:pointer;
+
+    transition:0.3s;
+}
+
+.reset-btn:hover{
+
+    background-color:
+    rgba(255,255,255,0.2);
+}
+
+.reset-btn:active{
+    transform:scale(0.95);
+}
+
+</style>
+</head>
+<body>
+
+<h1>🍉 Game Buah 🍓</h1>
+
+<div class="score-board">
+
+Percobaan:
+<span id="flips">0</span>
+
+&nbsp; | &nbsp;
+
+⏰ Waktu:
+<span id="timer">45</span>
+detik
+
+</div>
+
+<div
+class="game-container"
+id="game-board">
+</div>
+
+<button
+class="reset-btn"
+onclick="resetGame()">
+🎮 Main Lagi
+</button>
+
+<button
+class="reset-btn"
+id="music-btn"
+onclick="toggleMusic()">
+🔊 Musik ON
+</button>
+
+<!-- AUDIO -->
+
+<audio id="bg-music" loop>
+    <source
+    src="sound.mp3"
+    type="audio/mpeg">
+</audio>
+
+<audio id="win-sound">
+    <source
+    src="kemenangan.mp3"
+    type="audio/mpeg">
+</audio>
+
+<script>
+
+const board =
+document.getElementById(
+'game-board'
+);
+
+const flipsCount =
+document.getElementById(
+'flips'
+);
+
+const timerDisplay =
+document.getElementById(
+'timer'
+);
+
+const bgMusic =
+document.getElementById(
+'bg-music'
+);
+
+const winSound =
+document.getElementById(
+'win-sound'
+);
+
+bgMusic.volume = 0.3;
+
+const cardImages = [
+
+    'alpukat.avif',
+    'anggur.webp',
+    'jeruk.jpg',
+    'kelapa.jpg',
+    'mangga.jpg',
+    'pisang.png',
+    'semangka.jpg',
+    'strowberi.jpg'
+];
+
+let cardsArray =
+[
+...cardImages,
+...cardImages
+];
+
+let flippedCards = [];
+
+let lockBoard = false;
+
+let totalFlips = 0;
+
+let timeLeft = 45;
+
+let timerInterval;
+
+let gameOver = false;
+
+let musicStarted = false;
+
+/* =========================
+   START MUSIC
+========================= */
+
+function startMusic(){
+
+    if(!musicStarted){
+
+        bgMusic.play()
+        .then(()=>{
+
+            musicStarted = true;
+
+        })
+        .catch(err=>{
+
+            console.log(err);
+        });
+    }
+}
+
+/* =========================
+   TOGGLE MUSIC
+========================= */
+
+function toggleMusic(){
+
+    if(bgMusic.paused){
+
+        bgMusic.play();
+
+        document
+        .getElementById(
+        'music-btn'
+        )
+        .innerText =
+        '🔊 Musik ON';
+
+    }else{
+
+        bgMusic.pause();
+
+        document
+        .getElementById(
+        'music-btn'
+        )
+        .innerText =
+        '🔈 Musik OFF';
+    }
+}
+
+/* =========================
+   SOUND EFFECT
+========================= */
+
+const audioCtx =
+new (
+window.AudioContext ||
+window.webkitAudioContext
+)();
+
+function playSound(type){
+
+    if(audioCtx.state === 'suspended'){
+        audioCtx.resume();
+    }
+
+    const osc =
+    audioCtx.createOscillator();
+
+    const gain =
+    audioCtx.createGain();
+
+    osc.connect(gain);
+
+    gain.connect(
+    audioCtx.destination
+    );
+
+    /* CLICK */
+
+    if(type === 'click'){
+
+        osc.type = 'sine';
+
+        osc.frequency
+        .setValueAtTime(
+            600,
+            audioCtx.currentTime
+        );
+
+        gain.gain
+        .setValueAtTime(
+            0.1,
+            audioCtx.currentTime
+        );
+
+        gain.gain
+        .exponentialRampToValueAtTime(
+            0.01,
+            audioCtx.currentTime + 0.1
+        );
+
+        osc.start();
+
+        osc.stop(
+        audioCtx.currentTime + 0.1
+        );
+    }
+
+    /* MATCH */
+
+    else if(type === 'match'){
+
+        osc.type = 'triangle';
+
+        osc.frequency
+        .setValueAtTime(
+            600,
+            audioCtx.currentTime
+        );
+
+        osc.frequency
+        .setValueAtTime(
+            900,
+            audioCtx.currentTime + 0.1
+        );
+
+        gain.gain
+        .setValueAtTime(
+            0.15,
+            audioCtx.currentTime
+        );
+
+        gain.gain
+        .exponentialRampToValueAtTime(
+            0.01,
+            audioCtx.currentTime + 0.3
+        );
+
+        osc.start();
+
+        osc.stop(
+        audioCtx.currentTime + 0.3
+        );
+    }
+
+    /* WRONG */
+
+    else if(type === 'wrong'){
+
+        // GETAR HP
+
+        if(navigator.vibrate){
+
+            navigator.vibrate(
+            [200,100,200]
+            );
+        }
+
+        osc.type = 'sawtooth';
+
+        osc.frequency
+        .setValueAtTime(
+            150,
+            audioCtx.currentTime
+        );
+
+        osc.frequency
+        .linearRampToValueAtTime(
+            80,
+            audioCtx.currentTime + 0.2
+        );
+
+        gain.gain
+        .setValueAtTime(
+            0.1,
+            audioCtx.currentTime
+        );
+
+        gain.gain
+        .exponentialRampToValueAtTime(
+            0.01,
+            audioCtx.currentTime + 0.25
+        );
+
+        osc.start();
+
+        osc.stop(
+        audioCtx.currentTime + 0.25
+        );
+    }
+}
+
+/* =========================
+   SHUFFLE
+========================= */
+
+function shuffle(array){
+
+    for(
+        let i = array.length - 1;
+        i > 0;
+        i--
+    ){
+
+        const j =
+        Math.floor(
+        Math.random() * (i + 1)
+        );
+
+        [array[i],array[j]] =
+        [array[j],array[i]];
+    }
+
+    return array;
+}
+
+/* =========================
+   TIMER
+========================= */
+
+function startTimer(){
+
+    clearInterval(timerInterval);
+
+    timeLeft = 45;
+
+    timerDisplay.textContent =
+    timeLeft;
+
+    gameOver = false;
+
+    timerInterval =
+    setInterval(()=>{
+
+        timeLeft--;
+
+        timerDisplay.textContent =
+        timeLeft;
+
+        if(timeLeft <= 0){
+
+            clearInterval(
+            timerInterval
+            );
+
+            gameOver = true;
+
+            alert(
+            '⏰ Waktu habis!\n\nPercobaan Anda: ' +
+            totalFlips
+            );
+        }
+
+    },1000);
+}
+
+/* =========================
+   CREATE BOARD
+========================= */
+
+function createBoard(){
+
+    board.innerHTML = '';
+
+    const shuffledCards =
+    shuffle([...cardsArray]);
+
+    shuffledCards.forEach(
+    (imgSrc)=>{
+
+        const card =
+        document.createElement(
+        'div'
+        );
+
+        card.classList.add(
+        'card'
+        );
+
+        card.dataset.image =
+        imgSrc;
+
+        card.innerHTML = `
+
+            <div class="card-front">
+                <img
+                src="${imgSrc}"
+                alt="Buah">
+            </div>
+
+            <div class="card-back">
+            </div>
+
+        `;
+
+        card.addEventListener(
+        'click',
+        flipCard
+        );
+
+        board.appendChild(card);
+    });
+}
+
+/* =========================
+   FLIP CARD
+========================= */
+
+function flipCard(){
+
+    startMusic();
+
+    if(gameOver) return;
+
+    if(lockBoard) return;
+
+    if(this === flippedCards[0])
+    return;
+
+    playSound('click');
+
+    this.classList.add(
+    'flipped'
+    );
+
+    flippedCards.push(this);
+
+    if(flippedCards.length === 2){
+
+        totalFlips++;
+
+        flipsCount.textContent =
+        totalFlips;
+
+        checkMatch();
+    }
+}
+
+/* =========================
+   CHECK MATCH
+========================= */
+
+function checkMatch(){
+
+    const isMatch =
+
+    flippedCards[0]
+    .dataset.image ===
+
+    flippedCards[1]
+    .dataset.image;
+
+    if(isMatch){
+
+        setTimeout(()=>{
+
+            playSound('match');
+
+        },200);
+
+        disableCards();
+
+    }else{
+
+        setTimeout(()=>{
+
+            playSound('wrong');
+
+            flippedCards[0]
+            .classList.add(
+            'shake'
+            );
+
+            flippedCards[1]
+            .classList.add(
+            'shake'
+            );
+
+        },200);
+
+        unflipCards();
+    }
+}
+
+/* =========================
+   DISABLE CARD
+========================= */
+
+function disableCards(){
+
+    flippedCards[0]
+    .removeEventListener(
+        'click',
+        flipCard
+    );
+
+    flippedCards[1]
+    .removeEventListener(
+        'click',
+        flipCard
+    );
+
+    resetTurn();
+
+    const allFlipped =
+
+    document.querySelectorAll(
+    '.card.flipped'
+    ).length;
+
+    if(allFlipped === cardsArray.length){
+
+        clearInterval(
+        timerInterval
+        );
+
+        gameOver = true;
+
+        setTimeout(()=>{
+
+            winSound.play();
+
+            alert(
+
+            '🎉 Selamat!\n\n' +
+
+            'Semua kartu berhasil dicocokkan dalam ' +
+
+            totalFlips +
+
+            ' percobaan.\n\nSisa waktu: ' +
+
+            timeLeft +
+
+            ' detik'
+            );
+
+        },500);
+    }
+}
+
+/* =========================
+   UNFLIP
+========================= */
+
+function unflipCards(){
+
+    lockBoard = true;
+
+    setTimeout(()=>{
+
+        flippedCards[0]
+        .classList.remove(
+        'flipped',
+        'shake'
+        );
+
+        flippedCards[1]
+        .classList.remove(
+        'flipped',
+        'shake'
+        );
+
+        resetTurn();
+
+    },1000);
+}
+
+/* =========================
+   RESET TURN
+========================= */
+
+function resetTurn(){
+
+    flippedCards = [];
+
+    lockBoard = false;
+}
+
+/* =========================
+   RESET GAME
+========================= */
+
+function resetGame(){
+
+    totalFlips = 0;
+
+    flipsCount.textContent = 0;
+
+    flippedCards = [];
+
+    lockBoard = false;
+
+    gameOver = false;
+
+    playSound('click');
+
+    createBoard();
+
+    startTimer();
+}
+
+/* =========================
+   START GAME
+========================= */
+
+createBoard();
+
+startTimer();
+
+</script>
+
+</body>
+</html>
